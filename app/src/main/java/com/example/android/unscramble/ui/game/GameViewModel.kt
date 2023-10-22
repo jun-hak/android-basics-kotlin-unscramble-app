@@ -20,6 +20,7 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.TtsSpan
 import android.util.Log
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,21 +28,50 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import java.util.Calendar
+import kotlin.random.Random
 
 /**
  * ViewModel containing the app data and methods to process the data
  */
-class GameViewModel : ViewModel() {
-    private val _score = MutableStateFlow(0)
+
+class SaveableMutableStateFlow<T>(
+    private val saveStateHandler: SavedStateHandle,
+    private val key: String,
+    initialValue: T
+) {
+    private val state: StateFlow<T> = saveStateHandler.getStateFlow(key, initialValue)
+    var value: T
+        get() = state.value
+        set(value) {
+            saveStateHandler[key] = value
+        }
+
+    fun asStateFlow(): StateFlow<T> = state
+}
+
+fun <T> SavedStateHandle.getMutableStateFlow(key: String, value: T): SaveableMutableStateFlow<T> =
+    SaveableMutableStateFlow(this, key, value)
+
+// stateHandler는 Fragment에서 자동으로 주입해준다
+class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
+//    val score: StateFlow<Int> = stateHandler.getStateFlow("score", 0)
+//    private fun setScore(value: Int) {
+//        stateHandler["score"] = value
+//    }
+
+    private val _score = stateHandler.getMutableStateFlow("score", 0)
     val score: StateFlow<Int>
-        get() = _score
+        get() = _score.asStateFlow()
 
-    private val _currentWordCount = MutableStateFlow(0)
+
+    private val _currentWordCount = stateHandler.getMutableStateFlow("wordCount", 0)
     val currentWordCount: StateFlow<Int>
-        get() = _currentWordCount
+        get() = _currentWordCount.asStateFlow()
 
-    private val _currentScrambledWord = MutableStateFlow("")
+    private val _currentScrambledWord = stateHandler.getMutableStateFlow("scrambleWord", "")
     val currentScrambledWord: StateFlow<Spannable> = _currentScrambledWord
+        .asStateFlow()
         .map {
             val scrambledWord = it
             val spannable: Spannable = SpannableString(scrambledWord)
@@ -69,7 +99,7 @@ class GameViewModel : ViewModel() {
      * Updates currentWord and currentScrambledWord with the next word.
      */
     private fun getNextWord() {
-        currentWord = allWordsList.random()
+        currentWord = allWordsList.random(Random(Calendar.getInstance().timeInMillis))
         val tempWord = currentWord.toCharArray()
         tempWord.shuffle()
 
