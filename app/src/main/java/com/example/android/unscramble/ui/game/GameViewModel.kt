@@ -20,39 +20,39 @@ import android.text.Spannable
 import android.text.SpannableString
 import android.text.style.TtsSpan
 import android.util.Log
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * ViewModel containing the app data and methods to process the data
  */
 class GameViewModel : ViewModel() {
-    private val _score = MutableLiveData(0)
-    val score: LiveData<Int>
+    private val _score = MutableStateFlow(0)
+    val score: StateFlow<Int>
         get() = _score
 
-    private val _currentWordCount = MutableLiveData(0)
-    val currentWordCount: LiveData<Int>
+    private val _currentWordCount = MutableStateFlow(0)
+    val currentWordCount: StateFlow<Int>
         get() = _currentWordCount
 
-    private val _currentScrambledWord = MutableLiveData<String>()
-    val currentScrambledWord: LiveData<Spannable> = Transformations.map(_currentScrambledWord) {
-        if (it == null) {
-            SpannableString("")
-        } else {
-            val scrambledWord = it.toString()
+    private val _currentScrambledWord = MutableStateFlow("")
+    val currentScrambledWord: StateFlow<Spannable> = _currentScrambledWord
+        .map {
+            val scrambledWord = it
             val spannable: Spannable = SpannableString(scrambledWord)
             spannable.setSpan(
-                    TtsSpan.VerbatimBuilder(scrambledWord).build(),
-                    0,
-                    scrambledWord.length,
-                    Spannable.SPAN_INCLUSIVE_INCLUSIVE
+                TtsSpan.VerbatimBuilder(scrambledWord).build(),
+                0,
+                scrambledWord.length,
+                Spannable.SPAN_INCLUSIVE_INCLUSIVE
             )
             spannable
-        }
-    }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpannableString(""))
 
     // List of words used in the game
     private var wordsList: MutableList<String> = mutableListOf()
@@ -81,7 +81,7 @@ class GameViewModel : ViewModel() {
         } else {
             Log.d("Unscramble", "currentWord= $currentWord")
             _currentScrambledWord.value = String(tempWord)
-            _currentWordCount.value = _currentWordCount.value?.inc()
+            _currentWordCount.value = _currentWordCount.value.inc()
             wordsList.add(currentWord)
         }
     }
@@ -101,7 +101,7 @@ class GameViewModel : ViewModel() {
     * Increases the game score if the player’s word is correct.
     */
     private fun increaseScore() {
-        _score.value = _score.value?.plus(SCORE_INCREASE)
+        _score.value = _score.value.plus(SCORE_INCREASE)
     }
 
     /*
@@ -120,7 +120,7 @@ class GameViewModel : ViewModel() {
     * Returns true if the current word count is less than MAX_NO_OF_WORDS
     */
     fun nextWord(): Boolean {
-        return if (_currentWordCount.value!! < MAX_NO_OF_WORDS) {
+        return if (_currentWordCount.value < MAX_NO_OF_WORDS) {
             getNextWord()
             true
         } else {
