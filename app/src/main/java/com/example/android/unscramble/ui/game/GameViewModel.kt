@@ -23,7 +23,6 @@ import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -85,8 +84,16 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SpannableString(""))
 
     // List of words used in the game
-    private var wordsList: MutableList<String> = mutableListOf()
-    private lateinit var currentWord: String
+    private var wordsList: List<String>
+        get() = stateHandler["wordsList"] ?: emptyList()
+        set(value) {
+            stateHandler["wordsList"] = value
+        }
+    private var currentWord: String
+        get() = stateHandler["currentWord"] ?: ""
+        set(value) {
+            stateHandler["currentWord"] = value
+        }
 
     private var isGameOver: Boolean = false
 
@@ -112,7 +119,7 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
             Log.d("Unscramble", "currentWord= $currentWord")
             _currentScrambledWord.value = String(tempWord)
             _currentWordCount.value = _currentWordCount.value.inc()
-            wordsList.add(currentWord)
+            wordsList = wordsList + currentWord
         }
     }
 
@@ -122,7 +129,7 @@ class GameViewModel(private val stateHandler: SavedStateHandle) : ViewModel() {
     fun reinitializeData() {
         _score.value = 0
         _currentWordCount.value = 0
-        wordsList.clear()
+        wordsList = emptyList()
         getNextWord()
         isGameOver = false
     }
